@@ -35,7 +35,7 @@ public class component_loot extends script.base_script
                 return SCRIPT_CONTINUE;
             }
             names[idx] = "reverseEngineered";
-            attribs[idx] = "";
+            attribs[idx] = "yes";
         }
         else 
         {
