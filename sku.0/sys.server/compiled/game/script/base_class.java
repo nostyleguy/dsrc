@@ -5,10 +5,10 @@
 
 package script;
 
+import script.library.utils;
+
 import java.io.File;
-import java.util.Arrays;
-import java.util.Hashtable;
-import java.util.Vector;
+import java.util.*;
 
 
 public class base_class
@@ -19851,6 +19851,22 @@ public class base_class
         _expelFromBuilding(getLongWithNull(target));
     }
 
+    /**
+     * Sends a dirty cell permissions update message directly to a player's client to forcibly
+     * update the client's cell permissions cache with regards to the cell in question as a means of
+     * more quickly granting/revoking access to a cell (e.g. in Death Watch Bunker).
+     *
+     * @param cell the obj_id of the cell you are updating permissions for
+     * @param player the obj_id of the player (and thus their client) to send the notification to
+     * @param isAllowed true if they are being added to enter a cell, false if they are being removed/banned
+     */
+    public static void sendDirtyCellPermissionsUpdate(obj_id cell, obj_id player, boolean isAllowed) {
+        _sendDirtyCellPermissionsUpdateToClient(getLongWithNull(cell), getLongWithNull(player), isAllowed);
+    }
+    private static native void _sendDirtyCellPermissionsUpdateToClient(long cell, long player, boolean isAllowed);
+
+
+
     /*@}*/
 
     /**
@@ -26785,6 +26801,42 @@ public class base_class
     private static native void _triggerServerWarning(String message);
     public static void WARNING(String message) {
         _triggerServerWarning("[dsrc] "+message);
+    }
+
+    /**
+     * getPlayerAccountUsername
+     * Returns the username of a player (they must have logged in at least once for this to work)
+     *
+     * The helper method (_getPlayerUsernameDoNotUse) is called in player.live_conversions OnInitialize
+     * and grabs the account username to store it as an ObjVar on the player so it is accessible all the
+     * time. Otherwise, user names are only accessible when the player is online. Do not use the DoNotUse
+     * JNI method in any implementation where you're looking for the account username of a player. Instead,
+     * use the getPlayerAccountUsername method, provided they have logged in once, this will return their
+     * account username (and it will update automatically if a character-account transfer takes place)
+     *
+     * @param player the player's Network ID
+     * @return the username of the player
+     */
+    public static String getPlayerAccountUsername(obj_id player) {
+        return getStringObjVar(player, "system.accountUsername");
+    }
+    public static native String _getPlayerUsernameDoNotUse(long player);
+
+    /**
+     * isInAdminTable
+     * Alternative to isGod check which validates if the player is connected from an account listed in the admin data table
+     * This validates the username regardless of whether /setGod is on or off so it is better for security and auditing of admin accounts
+     * or for announcements/messages to GM characters (in the case of SWG Source, for patch note/admin updates)
+     * @param player the player to validate
+     * @return if the player's account is in the admin table
+     */
+    public static boolean isInAdminTable(obj_id player) throws InterruptedException {
+        if(utils.checkConfigFlag("GameServer", "adminGodToAll")) {
+            return true;
+        } else {
+            List<String> adminUsernames = Arrays.asList(dataTableGetStringColumn(getConfigSetting("ConnectionServer", "adminAccountDataTable"), "AdminAccounts"));
+            return adminUsernames.contains(getPlayerAccountUsername(player));
+        }
     }
 
 }   // class base_class
