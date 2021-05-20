@@ -278,7 +278,7 @@ eng_kessel_rebel_novaldex_blackhole_elite	"xwing_engine_pos_s01:engine_pos1,xwin
 eng_kessel_rebel_novaldex_grb1138	"xwing_engine_pos_s01:engine_pos1,xwing_engine_neg_s01:engine_neg1"				
 eng_reward_kuat_elite	"xwing_engine_pos_s01:engine_pos1,xwing_engine_neg_s01:engine_neg1"				
 eng_nova_01	"xwing_engine_pos_s03:engine_pos1,xwing_engine_neg_s03:engine_neg1"				
-eng_orion_01	"xwing_engine_neg_s03:engine_pos1,xwing_engine_pos_s03:engine_neg1"				
+eng_orion_01	"xwing_engine_pos_s03:engine_pos1,xwing_engine_neg_s03:engine_neg1"				
 collection_reward_engine_01_mk1	"xwing_engine_pos_s01:engine_pos1,xwing_engine_neg_s01:engine_neg1"				
 collection_reward_engine_01_mk2	"xwing_engine_pos_s01:engine_pos1,xwing_engine_neg_s01:engine_neg1"				
 collection_reward_engine_01_mk3	"xwing_engine_pos_s01:engine_pos1,xwing_engine_neg_s01:engine_neg1"				
