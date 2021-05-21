@@ -173,7 +173,8 @@ public class qa_jtl_tools extends script.base_script
         "grievous_starfighter_reward_deed",
         "jedi_starfighter_reward_deed",
         "tieinterceptor_imperial_guard_reward_deed",
-        "y8_mining_ship_deed"
+        "y8_mining_ship_deed",
+	"yt2400_reward_deed"
     };
     public static final String[] SPACE_LOOT_CATEGORIES = 
     {
