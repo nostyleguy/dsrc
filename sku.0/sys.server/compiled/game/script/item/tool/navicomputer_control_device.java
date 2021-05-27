@@ -168,12 +168,15 @@ public class navicomputer_control_device extends script.base_script
         {
             return SCRIPT_OVERRIDE;
         }
-        if (!isIdValid(transferer))
-        {
-            return SCRIPT_OVERRIDE;
-        }
-        string_id strSpam = new string_id("space/space_interaction", "cant_transfer_active_computer");
-        sendSystemMessage(transferer, strSpam);
-        return SCRIPT_OVERRIDE;
+	// Note: The following validation of transferer is commented out because this call usually comes from a
+	// datapad-to-datapad trade, which is invoked (several calls later) from ServerSecureTrade::completeTrade
+	// which always calls ContainerImplementation::canTransferTo with 'nullptr' as the transferer. Therefore,
+	// transferer will (probably) always be null here. I am not sure if that is a good thing, but the
+	// trade still works. 
+        // if (!isIdValid(transferer))
+        // {
+        //     return SCRIPT_OVERRIDE;
+        // }
+        return SCRIPT_CONTINUE;
     }
 }
