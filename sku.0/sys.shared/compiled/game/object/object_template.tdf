@@ -1372,7 +1372,8 @@ enum GameObjectType
 	GOT_tool_survey,
 	GOT_tool_repair,
 	GOT_tool_camp_kit,
-	GOT_tool_ship_component_repair
+	GOT_tool_ship_component_repair,
+	GOT_tool_ship_component_retrofit_kit,
 	GOT_vehicle                            = 0x00010000,
 	GOT_vehicle_hover,
 	GOT_weapon                             = 0x00020000,//if you add weapon types, please add them to the GOT_powerups as well
@@ -1696,7 +1697,8 @@ enum GameObjectType
 	GOT_tool_survey,
 	GOT_tool_repair,
 	GOT_tool_camp_kit,
-	GOT_tool_ship_component_repair
+	GOT_tool_ship_component_repair,
+	GOT_tool_ship_component_retrofit_kit,	
 	GOT_vehicle                            = 0x00010000,
 	GOT_vehicle_hover,
 	GOT_vehicle_hover_ai,

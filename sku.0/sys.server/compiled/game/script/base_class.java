@@ -632,6 +632,7 @@ public class base_class
     public static final int GOT_tool_repair                        = ++private_GOT_counter;
     public static final int GOT_tool_camp_kit                      = ++private_GOT_counter;
     public static final int GOT_tool_ship_component_repair         = ++private_GOT_counter;
+    public static final int GOT_tool_ship_component_retrofit_kit   = ++private_GOT_counter;    
 
     public static final int GOT_vehicle                            = private_GOT_counter = 0x00010000;
     public static final int GOT_vehicle_hover                      = ++private_GOT_counter;
@@ -1746,6 +1747,11 @@ public class base_class
     public static void CustomerServiceLog(String channel, String msg, obj_id player1, obj_id player2)
     {
         _LOG("CustomerService", channel + ": " + msg, getSelf(), player1, player2, true);
+    }
+
+    public static void SpaceLog(String channel, String msg )
+    {
+        _LOG("Space", channel + ": " + msg, getSelf(), null, null, true);
     }
 
     // Returns the CPU time (DEBUG ONLY)

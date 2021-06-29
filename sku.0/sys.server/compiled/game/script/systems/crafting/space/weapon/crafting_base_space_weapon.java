@@ -33,6 +33,7 @@ public class crafting_base_space_weapon extends script.systems.crafting.crafting
         float damage_max = 0;
         int damage_max_i = 0;
         space_crafting.setWeaponEnergyPerShot(prototype, 0);
+	space_crafting.setWeaponProjectileIndex(prototype, space_crafting.getDefaultProjectileIndexFromWeaponTemplate(prototype));
         for (int i = 0; i < itemAttributes.length; ++i)
         {
             if (itemAttributes[i] == null)

@@ -936,6 +936,7 @@ tool_camp_kit	cloning_tube	int
 tool_ship_component_repair	crafter	string
 	repairpoints	int
 	serial_number	string
+tool_ship_component_retrofit_kit	tool_ship_component_retrofit_type	string
 weapon	@proc/proc:proc_name	enum	@ui_buff:proc_tow_proc_b_3 @ui_buff:towprocb_3	@ui_buff:proc_tow_proc_b_4 @ui_buff:towprocb_4	@ui_buff:proc_tow_proc_coyn @ui_buff:towproccoyn
 	@spam:pup_expire_time	int
 	@spam:pup_modifier	enum	@stat_n:armor_assembly	@stat_n:expertise_reverse_engineering_bonus	@stat_n:expertise_healing_all	@stat_n:jedi_saber_assembly	@stat_n:combat_block_value	@stat_n:luck_modified
@@ -1931,4 +1932,3 @@ ship_component_countermeasurelauncher	ship_component.ship_component_energy_requi
 	ship_component.ship_component_weapon_effectiveness_shields	float
 	ship_component.ship_component_weapon_refire_rate	float
 ship_component_cargo_hold	ship_component.ship_component_cargo_hold_contents_max	int
-ship_component_modification

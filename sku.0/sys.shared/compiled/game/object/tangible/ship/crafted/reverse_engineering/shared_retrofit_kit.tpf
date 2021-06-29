@@ -12,8 +12,8 @@ clearFloraRadius = 0
 objectName = "space_crafting_n" "retrofit_kit"
 detailedDescription = "space_crafting_d" "retrofit_kit"
 containerType = CT_none
-appearanceFilename = "appearance/eqp_data_disk.apt"
+appearanceFilename = "appearance/eqp_tool_retrofit_kit.apt"
 portalLayoutFilename = ""
 clientDataFile = ""
 
-gameObjectType = GOT_misc_item
+gameObjectType = GOT_tool_ship_component_retrofit

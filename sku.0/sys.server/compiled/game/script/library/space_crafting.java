@@ -20,6 +20,7 @@ public class space_crafting extends script.base_script
     public static final String SHIP_DROID_SLOT_NAME = "ship_droid";
     public static final String STF_COMPONENT_TOOL = "reverse_engineering_tool";
     public static final String SCRIPT_COMPONENT_NAME_HANDLER = "space.crafting.component_name_handler";
+    public static final String SCRIPT_COMPONENT_RENAME_HANDLER = "space.crafting.component_rename_handler";    
     public static final int DAMAGE_CHANCE = 5;
     public static final int[] NON_COMPONENT_DAMAGEABLES_LIGHT = 
     {
@@ -72,6 +73,7 @@ public class space_crafting extends script.base_script
     public static final String STARSHIP_DROID_TABLE = "datatables/space_combat/ship_droid_assignments.iff";
     public static final String SHIP_COMPONENT_TABLE = "datatables/space/ship_components.iff";
     public static final String SHIP_WEAPON_TABLE = "datatables/ship/components/weapon.iff";
+    public static final String WPN_TABLE = "datatables/space/ship_weapon_components.iff";    
     public static double randBell(double avg, double var)
     {
         var = var / 2;
@@ -398,6 +400,7 @@ public class space_crafting extends script.base_script
                         float fltRefireRate = dctParams.getFloat("fltRefireRate");
                         fltRefireRate = getBellValue(fltRefireRate, fltRefireRateModifier);
                         setWeaponRefireRate(objComponent, fltRefireRate);
+			setWeaponProjectileIndex(objComponent, getDefaultProjectileIndexFromWeaponTemplate(objComponent));
                         break;
                     case "capacitor": {
                         float fltCurrentEnergy = dctParams.getFloat("fltCurrentEnergy");
@@ -620,11 +623,15 @@ public class space_crafting extends script.base_script
     public static boolean setWeaponRefireRate(obj_id objComponent, float fltValue) {
         String OBJVAR_NAME = "ship_comp.weapon.refire_rate";
         return setObjVar(objComponent, OBJVAR_NAME, fltValue);
-    }
+    }   
     public static boolean setWeaponProjectileSpeed(obj_id objComponent, float fltValue) {
         String OBJVAR_NAME = "ship_comp.weapon.projectile_speed";
         return setObjVar(objComponent, OBJVAR_NAME, fltValue);
     }
+    public static boolean setWeaponProjectileIndex(obj_id objComponent, int intValue) {
+        String OBJVAR_NAME = "ship_comp.weapon.projectile_index";
+        return setObjVar(objComponent, OBJVAR_NAME, intValue);
+    }    
     public static float getComponentCurrentHitpoints(obj_id objComponent) {
         String OBJVAR_NAME = "ship_comp.hitpoints_current";
         return getFloatObjVar(objComponent, OBJVAR_NAME);
@@ -805,6 +812,10 @@ public class space_crafting extends script.base_script
         String OBJVAR_NAME = "ship_comp.weapon.projectile_speed";
         return getFloatObjVar(objComponent, OBJVAR_NAME);
     }
+    public static int getWeaponProjectileIndex(obj_id objComponent) {
+        String OBJVAR_NAME = "ship_comp.weapon.projectile_index";
+        return getIntObjVar(objComponent, OBJVAR_NAME);
+    }    
     public static Vector getRepairKitsForItem(obj_id objPlayer, int intSlot) throws InterruptedException
     {
         String strComponent;
@@ -2405,5 +2416,11 @@ public class space_crafting extends script.base_script
     }
     public static boolean blog(String category, String msg) {
         return true;
+    }
+    public static int getDefaultProjectileIndexFromWeaponTemplate(obj_id weapon) throws InterruptedException {
+	String template = utils.getTemplateFilenameNoPath(weapon).replace(".iff","");
+	int intWpnIndex = dataTableGetInt(WPN_TABLE, template, "projectile_index");
+	LOG("Space", "_NER_ getDefaultProjectileIndexFromWeaponTemplate ProjIndex for template: "+ template+ ": " + intWpnIndex);
+	return intWpnIndex;
     }
 }

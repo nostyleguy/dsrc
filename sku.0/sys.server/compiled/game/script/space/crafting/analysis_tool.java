@@ -24,6 +24,16 @@ public class analysis_tool extends script.base_script
     public static final String ANALYZE_PROMPT = "@" + STF + ":analyze_prompt";
     public static final String NO_ITEMS_PROMPT = "@" + STF + ":no_items";
     public static final String BTN_ANALYZE = "@" + STF + ":analyze";
+
+    public static final String OBJVAR_ANALYSIS_TOOL_MODE = "analysis_tool.mode";
+    public static final String OBJVAR_ANALYSIS_TOOL_LEVEL = "analysis_tool.level";
+    public static final String OBJVAR_ANALYSIS_TOOL_TYPE = "analysis_tool.type";
+    
+    public static final int MODE_UNSET = 0;
+    public static final int MODE_REVERSE = 1;
+    public static final int MODE_KSE = 2;
+    public static final int MODE_MODIFY = 3;
+    
     public int OnAttach(obj_id self) throws InterruptedException
     {
         return SCRIPT_CONTINUE;
@@ -32,7 +42,172 @@ public class analysis_tool extends script.base_script
     {
         return SCRIPT_CONTINUE;
     }
+
     public int OnAboutToReceiveItem(obj_id self, obj_id srcContainer, obj_id transferer, obj_id item) throws InterruptedException
+    {
+	if (utils.hasLocalVar(self, "ctsBeingUnpacked"))
+        {
+            return SCRIPT_CONTINUE;
+        }
+
+	obj_id[] toolContents = getContents(self);
+        if (toolContents != null && toolContents.length == 0)
+        {
+	    setObjVar(self, OBJVAR_ANALYSIS_TOOL_MODE, MODE_UNSET);
+	    removeObjVar(self, OBJVAR_ANALYSIS_TOOL_LEVEL);
+	    removeObjVar(self, OBJVAR_ANALYSIS_TOOL_TYPE);
+	}	
+
+	int mode = getIntObjVar(self, OBJVAR_ANALYSIS_TOOL_MODE);
+	switch( mode ) {
+	case MODE_UNSET:
+	    return ReceiveItemInUnsetMode(self, srcContainer, transferer, item);
+	case MODE_REVERSE:
+	    return ReceiveItemInReverseMode(self, srcContainer, transferer, item);
+	case MODE_KSE:
+	    return ReceiveItemInKSEMode(self, srcContainer, transferer, item);
+	case MODE_MODIFY:
+	    return ReceiveItemInModifyMode(self, srcContainer, transferer, item);
+	default:
+	    LOG("Space", "Unhandled OBJVAR_ANALYSIS_TOOL_MODE: " + mode);
+	    return SCRIPT_OVERRIDE;
+	}
+    }
+
+    public int ReceiveItemInUnsetMode(obj_id self, obj_id srcContainer, obj_id transferer, obj_id item) throws InterruptedException
+    {
+	if (hasObjVar(item, "firespray_schematic.part"))
+        {
+	    setObjVar(self, OBJVAR_ANALYSIS_TOOL_MODE, MODE_KSE);
+	    removeObjVar(self, OBJVAR_ANALYSIS_TOOL_LEVEL);
+	    removeObjVar(self, OBJVAR_ANALYSIS_TOOL_TYPE);	    
+	    return SCRIPT_CONTINUE;
+	}
+	else
+	{
+            if (space_crafting.isValidShipComponent(item) == false )
+            {
+		_sendInvalidItemError(transferer);
+                return SCRIPT_OVERRIDE;
+            }
+	    else
+	    {
+		if (hasObjVar(item, "ship_comp.flags"))
+		{
+		    int flags = getIntObjVar(item, "ship_comp.flags");
+		    if( (flags & ship_component_flags.SCF_reverse_engineered) != 0)
+		    {
+			utils.setObjVar(self, OBJVAR_ANALYSIS_TOOL_MODE, MODE_MODIFY);
+			utils.removeObjVar(self, OBJVAR_ANALYSIS_TOOL_LEVEL);
+			utils.setObjVar(self, OBJVAR_ANALYSIS_TOOL_TYPE,
+					   space_crafting.getShipComponentStringType(item));	
+		    }
+		    else
+		    {
+			utils.setObjVar(self, OBJVAR_ANALYSIS_TOOL_MODE, MODE_REVERSE);
+			utils.setObjVar(self, OBJVAR_ANALYSIS_TOOL_LEVEL,
+					   space_crafting.getReverseEngineeringLevel(item));
+			utils.setObjVar(self, OBJVAR_ANALYSIS_TOOL_TYPE,
+					   space_crafting.getShipComponentStringType(item));
+		    }
+
+		    return SCRIPT_CONTINUE;
+		}
+		else {
+		    _sendInvalidItemError(transferer);
+		    return SCRIPT_OVERRIDE;
+		}
+	    }
+        }
+    }
+    public int ReceiveItemInKSEMode(obj_id self, obj_id srcContainer, obj_id transferer, obj_id item) throws InterruptedException
+    {
+	if (!hasObjVar(item, "firespray_schematic.part") )
+        {
+	    _sendInvalidItemError(transferer);
+	    return SCRIPT_OVERRIDE;
+	}
+	else if( getContents(self).length == 8)
+	{
+	    _sendTooManyError(transferer);
+	    return SCRIPT_OVERRIDE;
+	}	
+	return SCRIPT_CONTINUE;
+    }
+    public int ReceiveItemInReverseMode(obj_id self, obj_id srcContainer, obj_id transferer, obj_id item) throws InterruptedException
+    {
+	String type = getStringObjVar(self, OBJVAR_ANALYSIS_TOOL_TYPE);
+	int level = getIntObjVar(self, OBJVAR_ANALYSIS_TOOL_LEVEL);
+	if ((! space_crafting.getShipComponentStringType(item).equals(type))  ||
+	    space_crafting.getReverseEngineeringLevel(item) != level)
+	{
+	    _sendInvalidItemError(transferer);
+	    return SCRIPT_OVERRIDE;
+	}
+	else if (getContents(self).length == level)
+	{
+	    _sendTooManyError(transferer);
+	    return SCRIPT_OVERRIDE;
+	}
+	return SCRIPT_CONTINUE;
+    }
+    public int ReceiveItemInModifyMode(obj_id self, obj_id srcContainer, obj_id transferer, obj_id item) throws InterruptedException
+    {
+	String type = getStringObjVar(self, OBJVAR_ANALYSIS_TOOL_TYPE);
+	int level = getIntObjVar(self, OBJVAR_ANALYSIS_TOOL_LEVEL);
+	
+	if (hasObjVar(item, "ship_comp.flags"))
+	{
+	    String itemType =   space_crafting.getShipComponentStringType(item);
+            int flags = getIntObjVar(item, "ship_comp.flags");
+            boolean isBitSet = (flags & ship_component_flags.SCF_reverse_engineered) != 0;
+            if (isBitSet == true)
+            {
+		sendSystemMessageTestingOnly(transferer, "Already put in the REd part!");
+                return SCRIPT_OVERRIDE;
+            }
+	    else
+	    {
+		if( itemType.equals(type) )
+		{
+		    return SCRIPT_CONTINUE;
+		}
+		else
+		{
+		    sendSystemMessageTestingOnly(transferer, "Need to be same component type but type: '" + type + "' != '" + itemType +"'");
+		    return SCRIPT_OVERRIDE;
+		}
+	    }
+	}
+	else if ( false ) /* if item is the new consumable for this process ... */
+	{
+	    //return SCRIPT_CONTINUE;
+	}
+	else
+	{
+	    _sendInvalidItemError(transferer);
+	    return SCRIPT_OVERRIDE;
+	}
+	return SCRIPT_OVERRIDE;
+    }
+
+    private void _sendInvalidItemError(obj_id recipient)
+    {
+	string_id errormessage2 = new string_id(space_crafting.STF_COMPONENT_TOOL, "wrong_component_type");
+	sendSystemMessage(recipient, errormessage2);
+    }
+
+    private void _sendTooManyError(obj_id recipient)
+    {
+	string_id errortoomany = new string_id(space_crafting.STF_COMPONENT_TOOL, "too_many");
+	sendSystemMessage(recipient, errortoomany);
+    }
+    private void _sendTooFewError(obj_id recipient)
+    {
+	string_id errortoomany = new string_id(space_crafting.STF_COMPONENT_TOOL, "too_few");
+	sendSystemMessage(recipient, errortoomany);
+    }    
+    public int OnAboutToReceiveItem_(obj_id self, obj_id srcContainer, obj_id transferer, obj_id item) throws InterruptedException
     {
         if (utils.hasLocalVar(self, "ctsBeingUnpacked"))
         {
@@ -118,7 +293,73 @@ public class analysis_tool extends script.base_script
         }
         return SCRIPT_CONTINUE;
     }
+
     public int OnObjectMenuSelect(obj_id self, obj_id player, int item) throws InterruptedException
+    {
+        if (!utils.isNestedWithin(self, player))
+        {
+            return SCRIPT_CONTINUE;
+        }
+	if (item == menu_info_types.SERVER_MENU1)
+        {
+	    int mode = getIntObjVar(self, OBJVAR_ANALYSIS_TOOL_MODE);
+	    switch( mode ) {
+	    case MODE_UNSET:
+		return SCRIPT_CONTINUE;
+	    case MODE_REVERSE:
+		return AnalyzeReverseMode(self, player);
+	    case MODE_KSE:
+		return AnalyzeKSEMode(self, player);
+	    case MODE_MODIFY:
+		return AnalyzeModifyMode(self, player);
+	    default:
+		LOG("Space", "Unhandled OBJVAR_ANALYSIS_TOOL_MODE: " + mode);
+		return SCRIPT_CONTINUE;
+	    }
+	}
+	return SCRIPT_CONTINUE;
+    }
+    public int AnalyzeKSEMode(obj_id self, obj_id player) throws InterruptedException
+    {
+	obj_id[] toolContents = getContents(self);
+	if (toolContents.length != 8) {
+	    string_id notEnough = new string_id(space_crafting.STF_COMPONENT_TOOL, "not_enough");
+	    sendSystemMessage(player, notEnough);
+	    return SCRIPT_CONTINUE;
+	}
+	boolean[] allPieces = new boolean[8];
+	allPieces[0] = false;
+	allPieces[1] = false;
+	allPieces[2] = false;
+	allPieces[3] = false;
+	allPieces[4] = false;
+	allPieces[5] = false;
+	allPieces[6] = false;
+	allPieces[7] = false;
+	for (obj_id toolContent1 : toolContents)
+	{
+	    int piece = getIntObjVar(toolContent1, "firespray_schematic.part");
+	    allPieces[piece - 1] = true;
+	}
+	if (allPieces[0] == true && allPieces[1] == true && allPieces[2] == true && allPieces[3] == true && allPieces[4] == true && allPieces[5] == true && allPieces[6] == true && allPieces[7] == true)
+	{
+	    obj_id playerInv = utils.getInventoryContainer(player);	    
+	    obj_id schematic = create.object("object/tangible/space/special_loot/firespray_schematic.iff", playerInv, false, false);
+	    string_id gotSchematic = new string_id(space_crafting.STF_COMPONENT_TOOL, "gotschematic");
+	    sendSystemMessage(player, gotSchematic);
+	    for (obj_id toolContent : toolContents)
+	    {
+		destroyObject(toolContent);
+	    }
+	    return SCRIPT_CONTINUE;
+	}
+	else {
+	    string_id notUniquePieces = new string_id(space_crafting.STF_COMPONENT_TOOL, "notunique");
+	    sendSystemMessage(player, notUniquePieces);
+	    return SCRIPT_CONTINUE;
+	}
+    }
+    public int AnalyzeReverseMode(obj_id self, obj_id player) throws InterruptedException
     {
         if (!utils.isNestedWithin(self, player))
         {
@@ -127,181 +368,205 @@ public class analysis_tool extends script.base_script
         String template = utils.getTemplateFilenameNoPath(self);
         boolean giveFiresprayPiece = false;
         obj_id newComponent = null;
-        if (item == menu_info_types.SERVER_MENU1)
-        {
-            int charges = getIntObjVar(self, "reverse_engineering.charges");
-            obj_id[] toolContents = getContents(self);
-            obj_id playerInv = utils.getInventoryContainer(player);
-            String temp = "";
-            if (toolContents == null || toolContents.length <= 0)
-            {
-                return SCRIPT_CONTINUE;
-            }
-            else 
-            {
-                if (toolContents[0] != null)
-                {
-                    int level = space_crafting.getReverseEngineeringLevel(toolContents[0]);
-                    if (hasObjVar(toolContents[0], "firespray_schematic.part"))
-                    {
-                        level = 8;
-                    }
-                    if (level > toolContents.length)
-                    {
-                        string_id errortoomany = new string_id(space_crafting.STF_COMPONENT_TOOL, "too_few");
-                        sendSystemMessage(player, errortoomany);
-                        return SCRIPT_OVERRIDE;
-                    }
-                    if (level < toolContents.length)
-                    {
-                        string_id errortoomany = new string_id(space_crafting.STF_COMPONENT_TOOL, "too_many");
-                        sendSystemMessage(player, errortoomany);
-                        return SCRIPT_OVERRIDE;
-                    }
-                    String componentType = space_crafting.getShipComponentStringType(toolContents[0]);
-                    giveFiresprayPiece = calculateFiresprayGrant(toolContents, player);
-                    if (hasObjVar(toolContents[0], "firespray_schematic.part"))
-                    {
-                        componentType = "firespray_schematic";
-                    }
-                    switch (componentType) {
-                        case "armor":
-                            newComponent = reverseEngineerArmor(toolContents, player, level);
-                            if (newComponent != null) {
-                                charges--;
-                                setObjVar(self, "reverse_engineering.charges", charges);
-                                int flags = getIntObjVar(newComponent, "ship_comp.flags");
-                                flags |= ship_component_flags.SCF_reverse_engineered;
-                                setObjVar(newComponent, "ship_comp.flags", flags);
-                            }
-                            break;
-                        case "booster":
-                            newComponent = reverseEngineerBooster(toolContents, player, level);
-                            if (newComponent != null) {
-                                charges--;
-                                setObjVar(self, "reverse_engineering.charges", charges);
-                                int flags = getIntObjVar(newComponent, "ship_comp.flags");
-                                flags |= ship_component_flags.SCF_reverse_engineered;
-                                setObjVar(newComponent, "ship_comp.flags", flags);
-                            }
-                            break;
-                        case "capacitor":
-                            newComponent = reverseEngineerCapacitor(toolContents, player, level);
-                            if (newComponent != null) {
-                                charges--;
-                                setObjVar(self, "reverse_engineering.charges", charges);
-                                int flags = getIntObjVar(newComponent, "ship_comp.flags");
-                                flags |= ship_component_flags.SCF_reverse_engineered;
-                                setObjVar(newComponent, "ship_comp.flags", flags);
-                            }
-                            break;
-                        case "droid_interface":
-                            newComponent = reverseEngineerDroidInterface(toolContents, player, level);
-                            if (newComponent != null) {
-                                charges--;
-                                setObjVar(self, "reverse_engineering.charges", charges);
-                                int flags = getIntObjVar(newComponent, "ship_comp.flags");
-                                flags |= ship_component_flags.SCF_reverse_engineered;
-                                setObjVar(newComponent, "ship_comp.flags", flags);
-                            }
-                            break;
-                        case "engine":
-                            newComponent = reverseEngineerEngine(toolContents, player, level);
-                            if (newComponent != null) {
-                                charges--;
-                                setObjVar(self, "reverse_engineering.charges", charges);
-                                int flags = getIntObjVar(newComponent, "ship_comp.flags");
-                                flags |= ship_component_flags.SCF_reverse_engineered;
-                                setObjVar(newComponent, "ship_comp.flags", flags);
-                            }
-                            break;
-                        case "reactor":
-                            newComponent = reverseEngineerReactor(toolContents, player, level);
-                            if (newComponent != null) {
-                                charges--;
-                                setObjVar(self, "reverse_engineering.charges", charges);
-                                int flags = getIntObjVar(newComponent, "ship_comp.flags");
-                                flags |= ship_component_flags.SCF_reverse_engineered;
-                                setObjVar(newComponent, "ship_comp.flags", flags);
-                            }
-                            break;
-                        case "shield":
-                            newComponent = reverseEngineerShield(toolContents, player, level);
-                            if (newComponent != null) {
-                                charges--;
-                                setObjVar(self, "reverse_engineering.charges", charges);
-                                int flags = getIntObjVar(newComponent, "ship_comp.flags");
-                                flags |= ship_component_flags.SCF_reverse_engineered;
-                                setObjVar(newComponent, "ship_comp.flags", flags);
-                            }
-                            break;
-                        case "weapon":
-                            newComponent = reverseEngineerWeapon(toolContents, player, level);
-                            if (newComponent != null) {
-                                charges--;
-                                setObjVar(self, "reverse_engineering.charges", charges);
-                                int flags = getIntObjVar(newComponent, "ship_comp.flags");
-                                flags |= ship_component_flags.SCF_reverse_engineered;
-                                setObjVar(newComponent, "ship_comp.flags", flags);
-                            }
-                            break;
-                        case "firespray_schematic":
-                            if (toolContents.length != 8) {
-                                string_id notEnough = new string_id(space_crafting.STF_COMPONENT_TOOL, "not_enough");
-                                sendSystemMessage(player, notEnough);
-                                return SCRIPT_CONTINUE;
-                            }
-                            boolean[] allPieces = new boolean[8];
-                            allPieces[0] = false;
-                            allPieces[1] = false;
-                            allPieces[2] = false;
-                            allPieces[3] = false;
-                            allPieces[4] = false;
-                            allPieces[5] = false;
-                            allPieces[6] = false;
-                            allPieces[7] = false;
-                            for (obj_id toolContent1 : toolContents) {
-                                int piece = utils.getIntObjVar(toolContent1, "firespray_schematic.part");
-                                allPieces[piece - 1] = true;
-                            }
-                            if (allPieces[0] == true && allPieces[1] == true && allPieces[2] == true && allPieces[3] == true && allPieces[4] == true && allPieces[5] == true && allPieces[6] == true && allPieces[7] == true) {
-                                obj_id schematic = create.object("object/tangible/space/special_loot/firespray_schematic.iff", playerInv, false, false);
-                                string_id gotSchematic = new string_id(space_crafting.STF_COMPONENT_TOOL, "gotschematic");
-                                sendSystemMessage(player, gotSchematic);
-                                for (obj_id toolContent : toolContents) {
-                                    destroyObject(toolContent);
-                                }
-                                return SCRIPT_CONTINUE;
-                            } else {
-                                string_id notUniquePieces = new string_id(space_crafting.STF_COMPONENT_TOOL, "notunique");
-                                sendSystemMessage(player, notUniquePieces);
-                                return SCRIPT_CONTINUE;
-                            }
-                        default:
-                            string_id sysmessage = new string_id(space_crafting.STF_COMPONENT_TOOL, "not_a_component");
-                            sendSystemMessage(player, sysmessage);
-                            return SCRIPT_OVERRIDE;
-                    }
-                }
-            }
-            if (giveFiresprayPiece == true)
-            {
-                if (isIdValid(newComponent))
-                {
-                    int pieceNum = rand(1, 8);
-                    obj_id schematicPiece = createObjectOverloaded("object/tangible/space/special_loot/firespray_schematic_part" + pieceNum + ".iff", playerInv);
-                    string_id gotPiece = new string_id(space_crafting.STF_COMPONENT_TOOL, "gotpiece");
-                    sendSystemMessage(player, gotPiece);
-                }
-            }
-            if (charges <= 0)
-            {
-                string_id outofcharges = new string_id(space_crafting.STF_COMPONENT_TOOL, "out_of_charges");
-                sendSystemMessage(player, outofcharges);
-                destroyObject(self);
-            }
-        }
+
+	int charges = getIntObjVar(self, "reverse_engineering.charges");
+	obj_id[] toolContents = getContents(self);
+	obj_id playerInv = utils.getInventoryContainer(player);
+	String temp = "";
+	if (toolContents == null || toolContents.length <= 0)
+	{
+	    return SCRIPT_CONTINUE;
+	}
+	else 
+	{
+	    if (toolContents[0] != null)
+	    {
+		int level = space_crafting.getReverseEngineeringLevel(toolContents[0]);
+		if (level > toolContents.length)
+		{
+		    string_id errortoomany = new string_id(space_crafting.STF_COMPONENT_TOOL, "too_few");
+		    sendSystemMessage(player, errortoomany);
+		    return SCRIPT_OVERRIDE;
+		}
+		if (level < toolContents.length)
+		{
+		    string_id errortoomany = new string_id(space_crafting.STF_COMPONENT_TOOL, "too_many");
+		    sendSystemMessage(player, errortoomany);
+		    return SCRIPT_OVERRIDE;
+		}
+		String componentType = space_crafting.getShipComponentStringType(toolContents[0]);
+		switch (componentType) {
+		case "armor":
+		    newComponent = reverseEngineerArmor(toolContents, player, level);
+		    if (newComponent != null) {
+			charges--;
+			setObjVar(self, "reverse_engineering.charges", charges);
+			int flags = getIntObjVar(newComponent, "ship_comp.flags");
+			flags |= ship_component_flags.SCF_reverse_engineered;
+			setObjVar(newComponent, "ship_comp.flags", flags);
+		    }
+		    break;
+		case "booster":
+		    newComponent = reverseEngineerBooster(toolContents, player, level);
+		    if (newComponent != null) {
+			charges--;
+			setObjVar(self, "reverse_engineering.charges", charges);
+			int flags = getIntObjVar(newComponent, "ship_comp.flags");
+			flags |= ship_component_flags.SCF_reverse_engineered;
+			setObjVar(newComponent, "ship_comp.flags", flags);
+		    }
+		    break;
+		case "capacitor":
+		    newComponent = reverseEngineerCapacitor(toolContents, player, level);
+		    if (newComponent != null) {
+			charges--;
+			setObjVar(self, "reverse_engineering.charges", charges);
+			int flags = getIntObjVar(newComponent, "ship_comp.flags");
+			flags |= ship_component_flags.SCF_reverse_engineered;
+			setObjVar(newComponent, "ship_comp.flags", flags);
+		    }
+		    break;
+		case "droid_interface":
+		    newComponent = reverseEngineerDroidInterface(toolContents, player, level);
+		    if (newComponent != null) {
+			charges--;
+			setObjVar(self, "reverse_engineering.charges", charges);
+			int flags = getIntObjVar(newComponent, "ship_comp.flags");
+			flags |= ship_component_flags.SCF_reverse_engineered;
+			setObjVar(newComponent, "ship_comp.flags", flags);
+		    }
+		    break;
+		case "engine":
+		    newComponent = reverseEngineerEngine(toolContents, player, level);
+		    if (newComponent != null) {
+			charges--;
+			setObjVar(self, "reverse_engineering.charges", charges);
+			int flags = getIntObjVar(newComponent, "ship_comp.flags");
+			flags |= ship_component_flags.SCF_reverse_engineered;
+			setObjVar(newComponent, "ship_comp.flags", flags);
+		    }
+		    break;
+		case "reactor":
+		    newComponent = reverseEngineerReactor(toolContents, player, level);
+		    if (newComponent != null) {
+			charges--;
+			setObjVar(self, "reverse_engineering.charges", charges);
+			int flags = getIntObjVar(newComponent, "ship_comp.flags");
+			flags |= ship_component_flags.SCF_reverse_engineered;
+			setObjVar(newComponent, "ship_comp.flags", flags);
+		    }
+		    break;
+		case "shield":
+		    newComponent = reverseEngineerShield(toolContents, player, level);
+		    if (newComponent != null) {
+			charges--;
+			setObjVar(self, "reverse_engineering.charges", charges);
+			int flags = getIntObjVar(newComponent, "ship_comp.flags");
+			flags |= ship_component_flags.SCF_reverse_engineered;
+			setObjVar(newComponent, "ship_comp.flags", flags);
+		    }
+		    break;
+		case "weapon":
+		    newComponent = reverseEngineerWeapon(toolContents, player, level);
+		    if (newComponent != null) {
+			charges--;
+			setObjVar(self, "reverse_engineering.charges", charges);
+			int flags = getIntObjVar(newComponent, "ship_comp.flags");
+			flags |= ship_component_flags.SCF_reverse_engineered;
+			setObjVar(newComponent, "ship_comp.flags", flags);
+		    }
+		    break;
+		default:
+		    string_id sysmessage = new string_id(space_crafting.STF_COMPONENT_TOOL, "not_a_component");
+		    sendSystemMessage(player, sysmessage);
+		    return SCRIPT_OVERRIDE;
+		}
+	    }
+	}
+	if (giveFiresprayPiece == true)
+	{
+	    if (isIdValid(newComponent))
+	    {
+		int pieceNum = rand(1, 8);
+		obj_id schematicPiece = createObjectOverloaded("object/tangible/space/special_loot/firespray_schematic_part" + pieceNum + ".iff", playerInv);
+		string_id gotPiece = new string_id(space_crafting.STF_COMPONENT_TOOL, "gotpiece");
+		sendSystemMessage(player, gotPiece);
+	    }
+	}
+	if (charges <= 0)
+	{
+	    string_id outofcharges = new string_id(space_crafting.STF_COMPONENT_TOOL, "out_of_charges");
+	    sendSystemMessage(player, outofcharges);
+	    destroyObject(self);
+	}
         return SCRIPT_CONTINUE;
+    }
+    public int AnalyzeModifyMode(obj_id self, obj_id player) throws InterruptedException
+    {
+        if (!utils.isNestedWithin(self, player))
+        {
+            return SCRIPT_CONTINUE;
+        }
+	sendSystemMessageTestingOnly(player, "You are trying to modify!");
+
+	obj_id re_part = null;
+	obj_id appearance_part = null;
+	obj_id consumable = null;
+
+	obj_id[] contents = getContents(self);
+	if(contents.length != 2)
+	{
+	    _sendTooFewError(player);
+	    return SCRIPT_CONTINUE;
+	}
+
+	// Find the RE part, Apperance part, and consumable from among the 3 input parts. 
+	for (obj_id content : contents)
+	{
+            if (isIdValid(content))
+            {
+                if ( hasObjVar(content, "ship_comp.flags"))
+		{
+		    int flags = getIntObjVar(content, "ship_comp.flags");
+		    boolean isBitSet = (flags & ship_component_flags.SCF_reverse_engineered) != 0;
+		    if (isBitSet == true)
+		    {
+			re_part = content;
+			LOG("Space", "RE is: " + re_part);	    						
+		    }
+		    else
+		    {
+			appearance_part = content;
+			LOG("Space", "App is: " + appearance_part);	    			
+		    }
+		}
+		else
+		{
+		    consumable = content;
+		}			    
+	    }
+	}
+	
+	String template = utils.getTemplateFilenameNoPath(appearance_part);
+	String type = getStringObjVar(self, OBJVAR_ANALYSIS_TOOL_TYPE);	
+        obj_id playerInv = utils.getInventoryContainer(player);
+        //obj_id newComponent = create.object("object/tangible/ship/components/"+type+"/" + template, playerInv, false, false);
+
+	if( type.equals("weapon") )
+	{
+	    int new_app = getIntObjVar(appearance_part, "ship_comp.weapon.projectile_index");
+	    LOG("Space", "Set new appearance to: " + new_app);	    
+	    space_crafting.setWeaponProjectileIndex(re_part, new_app);
+	    sendSystemMessageTestingOnly(player, "Changed appearance!");
+	    RenameComponent(re_part, player);
+	    destroyObject(appearance_part);
+	}
+	else
+	{
+	    sendSystemMessageTestingOnly(player, "Can only modify weapons at this time");		
+	}	    
+
+	return SCRIPT_CONTINUE;
     }
     public boolean calculateFiresprayGrant(obj_id[] contents, obj_id player) throws InterruptedException
     {
@@ -383,17 +648,7 @@ public class analysis_tool extends script.base_script
         fltBonus += Math.round(getReverseEngineeringExpertiseBonus(player)) * 0.001;
         return fltBonus;
     }
-    public obj_id createLegendaryLoot(obj_id player, obj_id tool, String category) throws InterruptedException
-    {
-        String[] items = dataTableGetStringColumn(LOOT_LOOKUP, category);
-        int pick = rand(0, items.length - 1);
-        String rare = dataTableGetString(LOOT_LOOKUP, pick, category);
-        String msg = dataTableGetString(LOOT_LOOKUP, pick, (category + "_strings"));
-        string_id sysmessage = new string_id(space_crafting.STF_COMPONENT_TOOL, msg);
-        sendSystemMessage(player, sysmessage);
-        destroyObject(tool);
-        return null;
-    }
+
     public obj_id reverseEngineerArmor(obj_id[] objComponents, obj_id player, int level) throws InterruptedException
     {
         int revSkill = getSkillStatisticModifier(player, "engineering_reverse");
@@ -443,7 +698,7 @@ public class analysis_tool extends script.base_script
             entries[0] = strMassAvg + " " + fltMassAverage + " --- " + strBonusApplied + " " + (fltBonus * 100) + "%" + " --- " + strFinalOutput + " " + fltMass;
             entries[1] = strHpAvg + " " + fltHpAverage + " --- " + strBonusApplied + " " + (fltBonus * 100) + "%" + " --- " + strFinalOutput + " " + fltHp;
             entries[2] = strArmorHpAvg + " " + fltArmorHpAverage + " --- " + strBonusApplied + " " + (fltBonus * 100) + "%" + " --- " + strFinalOutput + " " + fltArmorHp;
-            finishReverseEngineering(newComponent, player, objComponents, entries);
+            FinishReverseEngineering(newComponent, player, objComponents, entries);
         }
         else 
         {
@@ -557,7 +812,7 @@ public class analysis_tool extends script.base_script
             entries[6] = strBoosterConsumption + " " + fltBoosterConsumptionAverage + " --- " + strBonusApplied + " " + (fltBonus * 100) + "%" + " --- " + strFinalOutput + " " + fltBoosterConsumption;
             entries[7] = strBoosterAccel + " " + fltBoosterAccelAverage + " --- " + strBonusApplied + " " + (fltBonus * 100) + "%" + " --- " + strFinalOutput + " " + fltBoosterAccel;
             entries[8] = strBoosterSpeed + " " + fltBoosterSpeedAverage + " --- " + strBonusApplied + " " + (fltBonus * 100) + "%" + " --- " + strFinalOutput + " " + fltBoosterSpeed;
-            finishReverseEngineering(newComponent, player, objComponents, entries);
+            FinishReverseEngineering(newComponent, player, objComponents, entries);
         }
         else 
         {
@@ -644,7 +899,7 @@ public class analysis_tool extends script.base_script
             entries[3] = strEnergyMaintenance + " " + fltEnergyMaintenance + " --- " + strBonusApplied + " " + (fltBonus * 100) + "%" + " --- " + strFinalOutput + " " + fltEnergyMaintenanceFinal;
             entries[4] = strCapEnergy + " " + fltCapEnergyAverage + " --- " + strBonusApplied + " " + (fltBonus * 100) + "%" + " --- " + strFinalOutput + " " + fltCapEnergy;
             entries[5] = strCapRecharge + " " + fltCapRechargeAverage + " --- " + strBonusApplied + " " + (fltBonus * 100) + "%" + " --- " + strFinalOutput + " " + fltCapRecharge;
-            finishReverseEngineering(newComponent, player, objComponents, entries);
+            FinishReverseEngineering(newComponent, player, objComponents, entries);
         }
         else 
         {
@@ -721,7 +976,7 @@ public class analysis_tool extends script.base_script
             entries[2] = strArmorHpAvg + " " + fltArmorHpAverage + " --- " + strBonusApplied + " " + (fltBonus * 100) + "%" + " --- " + strFinalOutput + " " + fltArmorHp;
             entries[3] = strEnergyMaintenance + " " + fltEnergyMaintenance + " --- " + strBonusApplied + " " + (fltBonus * 100) + "%" + " --- " + strFinalOutput + " " + fltEnergyMaintenanceFinal;
             entries[4] = strDroidInterfaceSpeed + " " + fltDroidInterfaceSpeedAverage + " --- " + strBonusApplied + " " + (fltBonus * 100) + "%" + " --- " + strFinalOutput + " " + fltDroidInterfaceSpeed;
-            finishReverseEngineering(newComponent, player, objComponents, entries);
+            FinishReverseEngineering(newComponent, player, objComponents, entries);
         }
         else 
         {
@@ -839,7 +1094,7 @@ public class analysis_tool extends script.base_script
             entries[5] = strEngineYaw + " " + fltEngineYawAvg + " --- " + strBonusApplied + " " + (fltBonus * 100) + "%" + " --- " + strFinalOutput + " " + fltEngineYaw;
             entries[6] = strEngineRoll + " " + fltEngineRollAvg + " --- " + strBonusApplied + " " + (fltBonus * 100) + "%" + " --- " + strFinalOutput + " " + fltEngineRoll;
             entries[7] = strEngineSpeed + " " + fltEngineSpeedAvg + " --- " + strBonusApplied + " " + (fltBonus * 100) + "%" + " --- " + strFinalOutput + " " + fltEngineSpeed;
-            finishReverseEngineering(newComponent, player, objComponents, entries);
+            FinishReverseEngineering(newComponent, player, objComponents, entries);
         }
         else 
         {
@@ -907,7 +1162,7 @@ public class analysis_tool extends script.base_script
             entries[1] = strHpAvg + " " + fltHpAverage + " --- " + strBonusApplied + " " + (fltBonus * 100) + "%" + " --- " + strFinalOutput + " " + fltHp;
             entries[2] = strArmorHpAvg + " " + fltArmorHpAverage + " --- " + strBonusApplied + " " + (fltBonus * 100) + "%" + " --- " + strFinalOutput + " " + fltArmorHp;
             entries[3] = strReactorEnergy + " " + fltReactorEnergyAvg + " --- " + strBonusApplied + " " + (fltBonus * 100) + "%" + " --- " + strFinalOutput + " " + fltReactorEnergy;
-            finishReverseEngineering(newComponent, player, objComponents, entries);
+            FinishReverseEngineering(newComponent, player, objComponents, entries);
         }
         else 
         {
@@ -1004,7 +1259,7 @@ public class analysis_tool extends script.base_script
             entries[4] = strShdBackHp + " " + fltShdBackHpAvg + " --- " + strBonusApplied + " " + (fltBonus * 100) + "%" + " --- " + strFinalOutput + " " + fltShdBackHp;
             entries[5] = strShdFrontHp + " " + fltShdFrontHpAvg + " --- " + strBonusApplied + " " + (fltBonus * 100) + "%" + " --- " + strFinalOutput + " " + fltShdFrontHp;
             entries[6] = strShdRecharge + " " + fltShdRechargeAvg + " --- " + strBonusApplied + " " + (fltBonus * 100) + "%" + " --- " + strFinalOutput + " " + fltShdRecharge;
-            finishReverseEngineering(newComponent, player, objComponents, entries);
+            FinishReverseEngineering(newComponent, player, objComponents, entries);
         }
         else 
         {
@@ -1127,7 +1382,7 @@ public class analysis_tool extends script.base_script
             entries[7] = strWpnArmEffectiveness + " " + fltWpnArmEffectivenessAvg + " --- " + strBonusApplied + " " + (fltBonus * 100) + "%" + " --- " + strFinalOutput + " " + fltWpnArmEffectiveness;
             entries[8] = strWpnEnergyPerShot + " " + fltWpnEnergyPerShotAvg + " --- " + strBonusApplied + " " + (fltBonus * 100) + "%" + " --- " + strFinalOutput + " " + fltWpnEnergyPerShot;
             entries[9] = strWpnRefireRate + " " + fltWpnRefireRateAvg + " --- " + strBonusApplied + " " + (fltBonus * 100) + "%" + " --- " + strFinalOutput + " " + fltWpnRefireRate;
-            finishReverseEngineering(newComponent, player, objComponents, entries);
+            FinishReverseEngineering(newComponent, player, objComponents, entries);
         }
         else 
         {
@@ -1137,7 +1392,27 @@ public class analysis_tool extends script.base_script
         }
         return newComponent;
     }
-    public void finishReverseEngineering(obj_id newComponent, obj_id player, obj_id[] objComponents, String[] entries) throws InterruptedException
+    public void RenameComponent(obj_id newComponent, obj_id player) throws InterruptedException
+    {	
+	String prompt2 = utils.packStringId(new string_id(space_crafting.STF_COMPONENT_TOOL, "prompt2"));
+        String title2 = utils.packStringId(new string_id(space_crafting.STF_COMPONENT_TOOL, "title2"));
+        if (!hasScript(newComponent, space_crafting.SCRIPT_COMPONENT_RENAME_HANDLER))
+        {
+            attachScript(newComponent, space_crafting.SCRIPT_COMPONENT_RENAME_HANDLER);
+        }
+	int pid = sui.inputbox(newComponent, player, prompt2, sui.OK_ONLY, title2, sui.INPUT_NORMAL, null, "handleSetComponentName", null);
+        if (pid > -1)
+        {
+            showSUIPage(pid);
+        }
+        else 
+        {
+            string_id error = new string_id(space_crafting.STF_COMPONENT_TOOL, "bad_data");
+            sendSystemMessage(player, error);
+        }        
+    }
+
+    public void DisplayStatsAndNameComponent(obj_id newComponent, obj_id player, String[] entries) throws InterruptedException
     {
         String prompt = utils.packStringId(new string_id(space_crafting.STF_COMPONENT_TOOL, "prompt"));
         String title = utils.packStringId(new string_id(space_crafting.STF_COMPONENT_TOOL, "title"));
@@ -1154,9 +1429,20 @@ public class analysis_tool extends script.base_script
         {
             string_id error = new string_id(space_crafting.STF_COMPONENT_TOOL, "bad_data");
             sendSystemMessage(player, error);
-        }
-        for (obj_id objComponent : objComponents) {
+        }        
+    }
+
+    public void DestroyToolContents(obj_id[] objComponents) throws InterruptedException
+    {
+	for (obj_id objComponent : objComponents)
+	{
             destroyObject(objComponent);
         }
+    }
+
+    public void FinishReverseEngineering(obj_id newComponent, obj_id player, obj_id[] obj_components, String[] entries) throws InterruptedException
+    {
+	DisplayStatsAndNameComponent(newComponent, player, entries );
+	DestroyToolContents(obj_components);
     }
 }
